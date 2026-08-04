@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "308343632114",
+    "project_id": "social-app-76df3",
+    "storage_bucket": "social-app-76df3.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:308343632114:android:45d8583e8322395007206b",
+        "android_client_info": {
+          "package_name": "com.example.haritasosyal.flutter_proje"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCinotuN6btjdXKyru3wI2cLlmYsdK_bRg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
