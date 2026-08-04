@@ -3,6 +3,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
 import 'firebase_options.dart';
 import 'providers/auth_provider.dart';
+import 'providers/friends_provider.dart';
 import 'screens/auth_gate.dart';
 
 Future<void> main() async {
@@ -19,6 +20,7 @@ class MyApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()),
+        Provider(create: (_) => FriendsProvider()),
       ],
       child: MaterialApp(
         title: 'Harita Sosyal',
