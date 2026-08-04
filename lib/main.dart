@@ -3,6 +3,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
 import 'firebase_options.dart';
 import 'providers/auth_provider.dart';
+import 'screens/auth_gate.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -22,7 +23,7 @@ class MyApp extends StatelessWidget {
       child: MaterialApp(
         title: 'Harita Sosyal',
         theme: ThemeData(colorSchemeSeed: Colors.blue, useMaterial3: true),
-        home: const Scaffold(body: Center(child: Text('Harita Sosyal'))),
+        home: const AuthGate(),
       ),
     );
   }
