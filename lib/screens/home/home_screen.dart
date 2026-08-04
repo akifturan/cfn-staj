@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import '../../services/location_service.dart';
+import '../../services/overpass_service.dart';
 
 const _fallbackCenter = LatLng(41.0082, 28.9784);
 
@@ -15,6 +16,8 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   LatLng? _center;
   bool _locationUnavailable = false;
+  List<NearbyPlace> _nearbyPlaces = [];
+  bool _nearbyPlacesFailed = false;
 
   @override
   void initState() {
@@ -25,10 +28,27 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _resolveLocation() async {
     final location = await LocationService().getCurrentLocation();
     if (!mounted) return;
+    final center = location ?? _fallbackCenter;
     setState(() {
-      _center = location ?? _fallbackCenter;
+      _center = center;
       _locationUnavailable = location == null;
     });
+    _loadNearbyPlaces(center);
+  }
+
+  Future<void> _loadNearbyPlaces(LatLng center) async {
+    try {
+      final places = await OverpassService().fetchNearbyPlaces(center);
+      if (!mounted) return;
+      setState(() => _nearbyPlaces = places);
+    } on OverpassException {
+      if (!mounted) return;
+      setState(() => _nearbyPlacesFailed = true);
+    }
+  }
+
+  void _showPlaceName(String name) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(name)));
   }
 
   @override
@@ -54,6 +74,19 @@ class _HomeScreenState extends State<HomeScreen> {
                     point: center,
                     child: const Icon(Icons.my_location, color: Colors.blue),
                   ),
+                  for (final place in _nearbyPlaces)
+                    Marker(
+                      point: place.location,
+                      child: GestureDetector(
+                        onTap: () => _showPlaceName(place.name),
+                        child: Icon(
+                          place.type == 'supermarket'
+                              ? Icons.local_grocery_store
+                              : Icons.local_pharmacy,
+                          color: place.type == 'supermarket' ? Colors.green : Colors.red,
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ],
@@ -68,6 +101,19 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: const Padding(
                   padding: EdgeInsets.all(12),
                   child: Text('Konum alınamadı, varsayılan konum gösteriliyor'),
+                ),
+              ),
+            ),
+          if (_nearbyPlacesFailed)
+            Positioned(
+              top: _locationUnavailable ? 48 : 0,
+              left: 0,
+              right: 0,
+              child: Material(
+                color: Colors.red.shade100,
+                child: const Padding(
+                  padding: EdgeInsets.all(12),
+                  child: Text('Yakındaki yerler yüklenemedi'),
                 ),
               ),
             ),
