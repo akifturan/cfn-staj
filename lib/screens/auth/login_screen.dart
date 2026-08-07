@@ -25,6 +25,10 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _signIn() async {
+    if (_emailController.text.trim().isEmpty || _passwordController.text.isEmpty) {
+      setState(() => _errorMessage = 'E-posta ve şifre boş bırakılamaz.');
+      return;
+    }
     setState(() {
       _isLoading = true;
       _errorMessage = null;

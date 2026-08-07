@@ -26,6 +26,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   Future<void> _register() async {
+    if (_usernameController.text.trim().isEmpty ||
+        _emailController.text.trim().isEmpty ||
+        _passwordController.text.isEmpty) {
+      setState(() => _errorMessage = 'Kullanıcı adı, e-posta ve şifre boş bırakılamaz.');
+      return;
+    }
     setState(() {
       _isLoading = true;
       _errorMessage = null;
