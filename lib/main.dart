@@ -23,7 +23,7 @@ class MyApp extends StatelessWidget {
         Provider(create: (_) => FriendsProvider()),
       ],
       child: MaterialApp(
-        title: 'Harita Sosyal',
+        title: 'Yakında',
         theme: ThemeData(colorSchemeSeed: Colors.blue, useMaterial3: true),
         home: const AuthGate(),
       ),

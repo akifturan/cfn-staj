@@ -1,4 +1,4 @@
-# Harita Sosyal
+# Yakında
 
 Kullanıcının konumunu ve yakındaki market/eczaneleri harita üzerinde gösteren,
 arkadaş ekleme özelliğine sahip bir Flutter uygulaması.
