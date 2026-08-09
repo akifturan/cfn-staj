@@ -14,6 +14,7 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   final _searchController = TextEditingController();
   List<AppUser> _searchResults = [];
+  bool _hasSearched = false;
 
   @override
   void dispose() {
@@ -26,7 +27,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
         .read<FriendsProvider>()
         .searchUsersByUsername(_searchController.text.trim());
     if (!mounted) return;
-    setState(() => _searchResults = results);
+    setState(() {
+      _searchResults = results;
+      _hasSearched = true;
+    });
   }
 
   Future<void> _addFriend(String friendUid) async {
@@ -34,7 +38,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     await context.read<FriendsProvider>().addFriend(myUid, friendUid);
     if (!mounted) return;
     _searchController.clear();
-    setState(() => _searchResults = []);
+    setState(() {
+      _searchResults = [];
+      _hasSearched = false;
+    });
   }
 
   @override
@@ -89,12 +96,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     child: const Text('Ekle'),
                   ),
                 ),
+              if (_hasSearched && _searchResults.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Text(
+                    'Kullanıcı bulunamadı.',
+                    style: TextStyle(color: Theme.of(context).colorScheme.outline),
+                  ),
+                ),
               const Divider(),
               Text('Arkadaşlar', style: Theme.of(context).textTheme.titleMedium),
               FutureBuilder<List<AppUser>>(
                 future: context.read<FriendsProvider>().getFriends(me.friends),
                 builder: (context, friendsSnapshot) {
                   final friends = friendsSnapshot.data ?? const [];
+                  if (friends.isEmpty) {
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Text(
+                        'Henüz arkadaşın yok. Kullanıcı adı arayarak ekleyebilirsin.',
+                        style: TextStyle(color: Theme.of(context).colorScheme.outline),
+                      ),
+                    );
+                  }
                   return Column(
                     children: [
                       for (final friend in friends)
