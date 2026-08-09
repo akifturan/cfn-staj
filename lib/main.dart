@@ -25,6 +25,12 @@ class MyApp extends StatelessWidget {
       child: MaterialApp(
         title: 'Yakında',
         theme: ThemeData(colorSchemeSeed: Colors.blue, useMaterial3: true),
+        darkTheme: ThemeData(
+          colorSchemeSeed: Colors.blue,
+          brightness: Brightness.dark,
+          useMaterial3: true,
+        ),
+        themeMode: ThemeMode.system,
         home: const AuthGate(),
       ),
     );
