@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:latlong2/latlong.dart';
 import '../models/app_user.dart';
 
 class FriendsProvider {
@@ -41,5 +42,24 @@ class FriendsProvider {
         .where(FieldPath.documentId, whereIn: friendUids.take(10).toList())
         .get();
     return snapshot.docs.map((d) => AppUser.fromFirestore(d.id, d.data())).toList();
+  }
+
+  Future<void> setLocationSharing(String uid, bool enabled) async {
+    if (enabled) {
+      await _firestore.collection('users').doc(uid).update({'locationSharing': true});
+    } else {
+      await _firestore.collection('users').doc(uid).update({
+        'locationSharing': false,
+        'location': null,
+        'locationUpdatedAt': null,
+      });
+    }
+  }
+
+  Future<void> updateLocation(String uid, LatLng location) async {
+    await _firestore.collection('users').doc(uid).update({
+      'location': GeoPoint(location.latitude, location.longitude),
+      'locationUpdatedAt': FieldValue.serverTimestamp(),
+    });
   }
 }

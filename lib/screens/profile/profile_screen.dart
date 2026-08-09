@@ -63,7 +63,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
             children: [
               Text(me.username, style: Theme.of(context).textTheme.headlineSmall),
               Text(me.email),
-              const SizedBox(height: 24),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Konumumu arkadaşlarımla paylaş'),
+                value: me.locationSharing,
+                onChanged: (value) =>
+                    context.read<FriendsProvider>().setLocationSharing(myUid, value),
+              ),
+              const SizedBox(height: 8),
               TextField(
                 controller: _searchController,
                 decoration: InputDecoration(

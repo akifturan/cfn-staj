@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:provider/provider.dart';
+import '../../models/app_user.dart';
+import '../../providers/auth_provider.dart';
+import '../../providers/friends_provider.dart';
 import '../../services/location_service.dart';
 import '../../services/overpass_service.dart';
 
@@ -18,6 +22,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _locationUnavailable = false;
   List<NearbyPlace> _nearbyPlaces = [];
   bool _nearbyPlacesFailed = false;
+  List<AppUser> _friendLocations = [];
 
   @override
   void initState() {
@@ -34,6 +39,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _locationUnavailable = location == null;
     });
     _loadNearbyPlaces(center);
+    _syncFriendLocations(location);
   }
 
   Future<void> _loadNearbyPlaces(LatLng center) async {
@@ -47,8 +53,43 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<void> _syncFriendLocations(LatLng? realLocation) async {
+    try {
+      final myUid = context.read<AuthProvider>().currentUser!.uid;
+      final friendsProvider = context.read<FriendsProvider>();
+      final me = await friendsProvider.watchUser(myUid).first;
+
+      if (realLocation != null && me.locationSharing) {
+        await friendsProvider.updateLocation(myUid, realLocation);
+      }
+
+      final friends = await friendsProvider.getFriends(me.friends);
+      final sharing =
+          friends.where((f) => f.locationSharing && f.location != null).toList();
+      if (!mounted) return;
+      setState(() => _friendLocations = sharing);
+    } catch (_) {
+      // Konum paylaşımı senkronizasyonu başarısız olsa da harita çalışmaya devam etsin.
+    }
+  }
+
   void _showPlaceName(String name) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(name)));
+  }
+
+  void _showFriendInfo(AppUser friend) {
+    final updatedAt = friend.locationUpdatedAt;
+    final when = updatedAt == null ? '' : ' · ${_relativeTime(updatedAt)}';
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text('${friend.username}$when')));
+  }
+
+  String _relativeTime(DateTime time) {
+    final diff = DateTime.now().difference(time);
+    if (diff.inMinutes < 1) return 'az önce';
+    if (diff.inMinutes < 60) return '${diff.inMinutes} dakika önce';
+    if (diff.inHours < 24) return '${diff.inHours} saat önce';
+    return '${diff.inDays} gün önce';
   }
 
   @override
@@ -85,6 +126,14 @@ class _HomeScreenState extends State<HomeScreen> {
                               : Icons.local_pharmacy,
                           color: place.type == 'supermarket' ? Colors.green : Colors.red,
                         ),
+                      ),
+                    ),
+                  for (final friend in _friendLocations)
+                    Marker(
+                      point: friend.location!,
+                      child: GestureDetector(
+                        onTap: () => _showFriendInfo(friend),
+                        child: const Icon(Icons.person_pin_circle, color: Colors.purple),
                       ),
                     ),
                 ],
