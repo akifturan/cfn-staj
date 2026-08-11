@@ -9,6 +9,7 @@ class AppUser {
   final bool locationSharing;
   final LatLng? location;
   final DateTime? locationUpdatedAt;
+  final String? photoBase64;
 
   AppUser({
     required this.uid,
@@ -18,6 +19,7 @@ class AppUser {
     this.locationSharing = false,
     this.location,
     this.locationUpdatedAt,
+    this.photoBase64,
   });
 
   factory AppUser.fromFirestore(String uid, Map<String, dynamic> data) {
@@ -31,6 +33,7 @@ class AppUser {
       locationSharing: data['locationSharing'] as bool? ?? false,
       location: geo != null ? LatLng(geo.latitude, geo.longitude) : null,
       locationUpdatedAt: updatedAt?.toDate(),
+      photoBase64: data['photoBase64'] as String?,
     );
   }
 }

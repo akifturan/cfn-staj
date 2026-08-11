@@ -1,8 +1,11 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../../models/app_user.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/friends_provider.dart';
+import '../../widgets/user_avatar.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -31,6 +34,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _searchResults = results;
       _hasSearched = true;
     });
+  }
+
+  Future<void> _pickPhoto(String myUid) async {
+    final picked = await ImagePicker().pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 200,
+      maxHeight: 200,
+      imageQuality: 60,
+    );
+    if (picked == null) return;
+    final bytes = await picked.readAsBytes();
+    final base64Photo = base64Encode(bytes);
+    if (!mounted) return;
+    await context.read<FriendsProvider>().updatePhoto(myUid, base64Photo);
   }
 
   Future<void> _addFriend(String friendUid) async {
@@ -68,6 +85,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
+              Center(
+                child: GestureDetector(
+                  onTap: () => _pickPhoto(myUid),
+                  child: Stack(
+                    children: [
+                      UserAvatar(photoBase64: me.photoBase64, username: me.username, radius: 40),
+                      Positioned(
+                        right: 0,
+                        bottom: 0,
+                        child: CircleAvatar(
+                          radius: 12,
+                          backgroundColor: Theme.of(context).colorScheme.primary,
+                          child: const Icon(Icons.edit, size: 14, color: Colors.white),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
               Text(me.username, style: Theme.of(context).textTheme.headlineSmall),
               Text(me.email),
               SwitchListTile(
@@ -90,6 +127,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               for (final user in _searchResults)
                 ListTile(
+                  leading: UserAvatar(photoBase64: user.photoBase64, username: user.username),
                   title: Text(user.username),
                   trailing: TextButton(
                     onPressed: () => _addFriend(user.uid),
@@ -122,7 +160,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   return Column(
                     children: [
                       for (final friend in friends)
-                        ListTile(title: Text(friend.username)),
+                        ListTile(
+                          leading: UserAvatar(
+                            photoBase64: friend.photoBase64,
+                            username: friend.username,
+                          ),
+                          title: Text(friend.username),
+                        ),
                     ],
                   );
                 },

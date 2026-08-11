@@ -62,4 +62,8 @@ class FriendsProvider {
       'locationUpdatedAt': FieldValue.serverTimestamp(),
     });
   }
+
+  Future<void> updatePhoto(String uid, String photoBase64) async {
+    await _firestore.collection('users').doc(uid).update({'photoBase64': photoBase64});
+  }
 }
