@@ -1,4 +1,4 @@
-# 📍 Yakında
+# 📍 Circle
 
 Canlı konum paylaşımı, yakındaki yerler ve arkadaş takip sistemi sunan Flutter & Firebase mobil uygulaması.
 

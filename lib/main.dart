@@ -23,12 +23,87 @@ class MyApp extends StatelessWidget {
         Provider(create: (_) => FriendsProvider()),
       ],
       child: MaterialApp(
-        title: 'Yakında',
-        theme: ThemeData(colorSchemeSeed: Colors.blue, useMaterial3: true),
+        title: 'Circle',
+        theme: ThemeData(
+          colorSchemeSeed: const Color(0xFF00897B),
+          useMaterial3: true,
+          appBarTheme: const AppBarTheme(
+            centerTitle: true,
+            elevation: 0,
+            scrolledUnderElevation: 1,
+          ),
+          cardTheme: CardThemeData(
+            elevation: 2,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+          ),
+          inputDecorationTheme: InputDecorationTheme(
+            filled: true,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide.none,
+            ),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          ),
+          filledButtonTheme: FilledButtonThemeData(
+            style: FilledButton.styleFrom(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
+            ),
+          ),
+          navigationBarTheme: NavigationBarThemeData(
+            height: 68,
+            indicatorShape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+          ),
+        ),
         darkTheme: ThemeData(
-          colorSchemeSeed: Colors.blue,
+          colorSchemeSeed: const Color(0xFF00897B),
           brightness: Brightness.dark,
           useMaterial3: true,
+          appBarTheme: const AppBarTheme(
+            centerTitle: true,
+            elevation: 0,
+            scrolledUnderElevation: 1,
+          ),
+          cardTheme: CardThemeData(
+            elevation: 2,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+          ),
+          inputDecorationTheme: InputDecorationTheme(
+            filled: true,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide.none,
+            ),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          ),
+          filledButtonTheme: FilledButtonThemeData(
+            style: FilledButton.styleFrom(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
+            ),
+          ),
+          navigationBarTheme: NavigationBarThemeData(
+            height: 68,
+            indicatorShape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+          ),
         ),
         themeMode: ThemeMode.system,
         home: const AuthGate(),
