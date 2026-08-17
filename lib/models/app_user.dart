@@ -10,6 +10,7 @@ class AppUser {
   final LatLng? location;
   final DateTime? locationUpdatedAt;
   final String? photoBase64;
+  final int? breathHoldBestMs;
 
   AppUser({
     required this.uid,
@@ -20,6 +21,7 @@ class AppUser {
     this.location,
     this.locationUpdatedAt,
     this.photoBase64,
+    this.breathHoldBestMs,
   });
 
   factory AppUser.fromFirestore(String uid, Map<String, dynamic> data) {
@@ -34,6 +36,7 @@ class AppUser {
       location: geo != null ? LatLng(geo.latitude, geo.longitude) : null,
       locationUpdatedAt: updatedAt?.toDate(),
       photoBase64: data['photoBase64'] as String?,
+      breathHoldBestMs: (data['breathHoldBestMs'] as num?)?.toInt(),
     );
   }
 }

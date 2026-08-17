@@ -66,4 +66,8 @@ class FriendsProvider {
   Future<void> updatePhoto(String uid, String photoBase64) async {
     await _firestore.collection('users').doc(uid).update({'photoBase64': photoBase64});
   }
+
+  Future<void> updateBreathHoldRecord(String uid, int ms) async {
+    await _firestore.collection('users').doc(uid).update({'breathHoldBestMs': ms});
+  }
 }
