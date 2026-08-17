@@ -43,6 +43,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadNearbyPlaces(LatLng center) async {
+    setState(() => _nearbyPlacesFailed = false);
     try {
       final places = await OverpassService().fetchNearbyPlaces(center);
       if (!mounted) return;
@@ -160,9 +161,17 @@ class _HomeScreenState extends State<HomeScreen> {
               right: 0,
               child: Material(
                 color: Colors.red.shade100,
-                child: const Padding(
-                  padding: EdgeInsets.all(12),
-                  child: Text('Yakındaki yerler yüklenemedi'),
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Row(
+                    children: [
+                      const Expanded(child: Text('Yakındaki yerler yüklenemedi')),
+                      TextButton(
+                        onPressed: () => _loadNearbyPlaces(center),
+                        child: const Text('Tekrar Dene'),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
