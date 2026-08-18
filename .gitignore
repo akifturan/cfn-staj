@@ -1,6 +1,7 @@
 .claude/
 .agents/
 .codex/
+.opencode/
 AGENTS.md
 CLAUDE.md
 
