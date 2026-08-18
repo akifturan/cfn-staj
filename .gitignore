@@ -1,4 +1,8 @@
-.claude/settings.local.json
+.claude/
+.agents/
+.codex/
+AGENTS.md
+CLAUDE.md
 
 # Flutter/Dart
 .dart_tool/

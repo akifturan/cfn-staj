@@ -84,7 +84,7 @@
 **Model Tier:** T1
 
 **Implementation Notes:**
-- Run from the repo root (`docs/`, `CLAUDE.md`, etc. already exist there and are unaffected):
+- Run from the repo root (`docs/` etc. already exist there and are unaffected):
   ```bash
   flutter create --platforms=android --org com.example.haritasosyal .
   ```
