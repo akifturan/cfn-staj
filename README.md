@@ -12,6 +12,8 @@ Canlı konum paylaşımı, yakındaki yerler ve arkadaş takip sistemi sunan Flu
 - **Yakındaki Yerler** — Overpass API ile market ve eczane sorgulama (yeşil/kırmızı pin)
 - **Arkadaşlık Sistemi** — Prefix-tabanlı kullanıcı arama ve atomic batch write ile karşılıklı arkadaş ekleme
 - **Gerçek Zamanlı Konum Paylaşımı** — Arkadaşların haritada anlık konumlarını mor pin ile görme
+- **Hava Durumu** — Open-Meteo API ile bulunduğun konumun anlık sıcaklık/durum bilgisi, Nominatim ile şehir/ilçe etiketi
+- **Nefes Tutma Yarışı** — Basılı tutarak süre ölçen mini oyun, kişisel rekor ve arkadaşlarla asenkron liderlik tablosu
 - **Profil Fotoğrafı** — Galeriden seçim, Base64 olarak Firestore'da saklama
 - **Otomatik Tema** — Material 3 ile sistem temasına göre Light/Dark geçişi
 
@@ -56,25 +58,32 @@ lib/
 │
 ├── providers/
 │   ├── auth_provider.dart     # Auth state yönetimi
-│   └── friends_provider.dart  # Arkadaşlık & konum paylaşma
+│   └── friends_provider.dart  # Arkadaşlık, konum paylaşma & oyun rekoru
 │
 ├── screens/
 │   ├── auth_gate.dart         # Oturum yönlendirme
-│   ├── root_shell.dart        # Bottom navigation scaffold
+│   ├── root_shell.dart        # Bottom navigation scaffold (4 sekme)
 │   ├── auth/
 │   │   ├── login_screen.dart
 │   │   └── register_screen.dart
 │   ├── home/
 │   │   └── home_screen.dart   # Harita ekranı
+│   ├── weather/
+│   │   └── weather_screen.dart  # Hava durumu ekranı
+│   ├── game/
+│   │   └── game_screen.dart     # Nefes tutma yarışı ekranı
 │   └── profile/
 │       └── profile_screen.dart
 │
 ├── services/
-│   ├── location_service.dart  # GPS servisi
-│   └── overpass_service.dart  # Overpass API servisi
+│   ├── location_service.dart    # GPS servisi
+│   ├── overpass_service.dart    # Overpass API servisi (yakındaki yerler)
+│   ├── weather_service.dart     # Open-Meteo hava durumu servisi
+│   └── geocoding_service.dart   # Nominatim ters coğrafi kodlama
 │
 └── widgets/
-    └── user_avatar.dart       # Avatar bileşeni
+    ├── user_avatar.dart       # Avatar bileşeni
+    └── app_mark.dart          # Marka logosu (iki daire)
 ```
 
 ---
@@ -92,6 +101,7 @@ lib/
 | `location` | GeoPoint | Enlem/boylam |
 | `locationUpdatedAt` | Timestamp | Son konum güncelleme zamanı |
 | `photoBase64` | String? | Base64 profil fotoğrafı |
+| `breathHoldBestMs` | Number? | Nefes tutma oyunu kişisel rekoru (ms) |
 | `createdAt` | Timestamp | Hesap oluşturulma tarihi |
 
 ---
@@ -138,6 +148,9 @@ Arkadaş ekleme iki dokümanı günceller. Okuma gerektirmediği için Transacti
 
 ### Neden Overpass API?
 Google Maps API ücretli. OpenStreetMap verileri üzerinden Overpass QL ile ücretsiz, hızlı mekansal sorgulama yapılıyor.
+
+### Neden Open-Meteo & Nominatim?
+İkisi de API anahtarı gerektirmeyen ücretsiz servisler — projenin "backend sunucusu kurmadan hızlı prototipleme" prensibine uyuyor. Open-Meteo anlık sıcaklık/hava kodu, Nominatim ise koordinatı okunabilir şehir/ilçe adına çeviriyor.
 
 ---
 

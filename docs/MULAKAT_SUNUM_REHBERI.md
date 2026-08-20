@@ -1,4 +1,4 @@
-# 🎤 Yakında — Mülakat Sunum Rehberi
+# 🎤 Circle — Mülakat Sunum Rehberi
 
 > Bu doküman, staj mülakatında projeyi sunmak için bir **konuşma senaryosu** ve **provası** niteliğindedir.
 > Her bölüm, hocanıza projeyi anlatırken kullanabileceğiniz konuşma akışını içerir.
@@ -24,7 +24,7 @@
 
 ### Söylemeniz gereken:
 
-> "Bu projede **Yakında** adında bir mobil uygulama geliştirdim. Uygulama, kullanıcıların canlı konumlarını paylaşmalarını, yakınlarındaki market ve eczaneleri bulmalarını ve arkadaşlarını harita üzerinde takip etmelerini sağlıyor."
+> "Bu projede **Circle** adında bir mobil uygulama geliştirdim. Uygulama, kullanıcıların canlı konumlarını paylaşmalarını, yakınlarındaki market ve eczaneleri bulmalarını ve arkadaşlarını harita üzerinde takip etmelerini sağlıyor. Ayrıca bir hava durumu sekmesi ve arkadaşlarla asenkron skor yarıştığı küçük bir mini oyun da ekledim."
 
 > "Flutter ve Firebase tercih etmemin sebebi; Flutter ile tek kod tabanıyla hem Android hem iOS hedeflemek, Firebase ile de backend sunucusu kurmadan kimlik doğrulama, veritabanı ve gerçek zamanlı senkronizasyon elde etmek."
 
@@ -42,17 +42,21 @@
 
 ### Demo Senaryosu:
 
-1. **Uygulamayı başlat** → Giriş ekranını göster
-2. **test1@yakinda.com ile giriş yap** → AuthGate'in otomatik yönlendirmesini göster
-3. **Harita ekranı** → "Bakın, cihazımın GPS konumunu mavi pin ile gösteriyor. Çevredeki yeşil pinler marketleri, kırmızı pinler eczaneleri temsil ediyor."
-4. **Profil ekranı** → "Burada kullanıcı adı araması yapabiliyorum"
-5. **Konum paylaşım switch'i** → "Bu switch'i açtığımda konumum Firestore'a yazılıyor"
+1. **Uygulamayı başlat** → Giriş ekranını göster (yeni logo: iki iç içe daire — lacivert + turkuaz)
+2. **testuser1@example.com / test1234 ile giriş yap** → AuthGate'in otomatik yönlendirmesini göster
+3. **Harita sekmesi** → "Bakın, cihazımın GPS konumunu mavi pin ile gösteriyor. Çevredeki yeşil pinler marketleri, kırmızı pinler eczaneleri temsil ediyor."
+4. **Hava Durumu sekmesi** → "Bulunduğum konumun anlık sıcaklığını ve durumunu gösteriyor, Open-Meteo API'sinden çekiyorum, API anahtarı gerektirmiyor"
+5. **Oyun sekmesi** → "Basılı tutarak nefes tutma süremi ölçüyorum, arkadaşlarımla asenkron olarak liderlik tablosunda yarışıyoruz"
+6. **Profil sekmesi** → "Burada kullanıcı adı araması yapabiliyorum"
+7. **Konum paylaşım switch'i** → "Bu switch'i açtığımda konumum Firestore'a yazılıyor"
 
 ### Demo sırasında vurgulanacak noktalar:
 
 - "Haritadaki veriler OpenStreetMap'ten geliyor, Google Maps API kullanmadık — **tamamen ücretsiz**"
+- "Hava durumu da aynı prensiple Open-Meteo'dan, API anahtarı yönetmiyoruz"
 - "Konum paylaşımını kapattığımda Firestore'daki konum verim de temizleniyor — **gizlilik odaklı tasarım**"
 - "Tema otomatik olarak cihaz ayarına göre değişiyor — dark mode açarsak uygulama da karanlık temaya geçer"
+- "Alt navigasyonda 4 sekmeyi `IndexedStack` ile aynı anda ayakta tutuyorum, böylece Hava Durumu sekmesine her dönüşte tekrar API çağrısı yapmıyor"
 
 ---
 
@@ -65,24 +69,25 @@
 Katmanları açıklarken bu sırayı takip et:
 
 ```
-┌─────────────────────────────────┐
-│         SCREENS (View)          │  ← Kullanıcının gördüğü arayüz
-│   login, register, home, profil │
-├─────────────────────────────────┤
-│       PROVIDERS (ViewModel)     │  ← İş mantığı ve state yönetimi
-│     auth_provider               │
-│     friends_provider            │
-├─────────────────────────────────┤
-│         MODELS (Model)          │  ← Veri yapıları
-│         app_user.dart           │
-├─────────────────────────────────┤
-│        SERVICES (Data)          │  ← Dış dünya ile iletişim
-│   location_service              │
-│   overpass_service              │
-├─────────────────────────────────┤
-│         WIDGETS (Shared)        │  ← Yeniden kullanılabilir UI parçaları
-│         user_avatar.dart        │
-└─────────────────────────────────┘
+┌─────────────────────────────────────────┐
+│            SCREENS (View)                │  ← Kullanıcının gördüğü arayüz
+│  login, register, home, weather,          │
+│  game, profil                             │
+├─────────────────────────────────────────┤
+│         PROVIDERS (ViewModel)             │  ← İş mantığı ve state yönetimi
+│     auth_provider                         │
+│     friends_provider                      │
+├─────────────────────────────────────────┤
+│            MODELS (Model)                 │  ← Veri yapıları
+│            app_user.dart                  │
+├─────────────────────────────────────────┤
+│           SERVICES (Data)                 │  ← Dış dünya ile iletişim
+│   location_service, overpass_service      │
+│   weather_service, geocoding_service      │
+├─────────────────────────────────────────┤
+│          WIDGETS (Shared)                 │  ← Yeniden kullanılabilir UI parçaları
+│   user_avatar.dart, app_mark.dart         │
+└─────────────────────────────────────────┘
 ```
 
 > "Katmanlar arasında tek yönlü bağımlılık var: **Screens → Providers → Models/Services**. Bir service asla doğrudan UI'a erişmez, bir model asla bir widget'ı bilmez."
@@ -156,7 +161,7 @@ Kullanıcı → Kayıt Ol butonuna basar
 **Hocanın sorabilecekleri:**
 
 **S: "Overpass API'den veri gelmezse ne oluyor?"**
-> "İki katmanlı hata yönetimi var: HTTP timeout (20 saniye) ve özel `OverpassException` sınıfı. Hata olursa haritanın üstüne kırmızı bir banner gösteriyoruz — harita çalışmaya devam eder, sadece yakındaki yerler gösterilmez. Kullanıcı deneyimi kesilmez."
+> "Katmanlı bir hata yönetimi var: HTTP timeout (30 saniye), `attempt * 2` saniyelik artan beklemeyle 3 denemelik retry, ve özel `OverpassException` sınıfı. Hata olursa haritanın üstüne kırmızı bir banner ve manuel 'Tekrar Dene' butonu gösteriyoruz — harita çalışmaya devam eder, sadece yakındaki yerler gösterilmez. Kullanıcı deneyimi kesilmez. Bunu gerçek cihazda test ederken keşfettim: `overpass-api.de` ücretsiz/paylaşımlı bir servis, ara sıra 429 dönüyor ya da yavaş cevap veriyor — retry+backoff bu durumu büyük ölçüde çözdü."
 
 **S: "Gerçek zamanlı konum takibi nasıl çalışıyor?"**
 > "Kullanıcı profil ekranından konum paylaşımını açtığında, GPS konumu Firestore'daki dokümanına yazılıyor. Arkadaşları harita ekranını açtığında bu veriyi çekip mor pin olarak gösteriyor. Firestore'un `snapshots()` stream'i sayesinde anlık güncelleme mümkün."
@@ -245,8 +250,10 @@ Kullanıcı → Kayıt Ol butonuna basar
 ## ✅ Son Kontrol Listesi — Mülakata Girmeden Önce
 
 - [ ] **Uygulamayı çalıştırdın mı?** → `flutter run` ile cihazda veya emülatörde test et
-- [ ] **Test hesaplarıyla giriş yaptın mı?** → `test1@yakinda.com` / `test123456`
+- [ ] **Test hesaplarıyla giriş yaptın mı?** → `testuser1@example.com` / `test1234`
 - [ ] **Harita yükleniyor mu?** → GPS izni ver, yeşil/kırmızı pinleri gör
+- [ ] **Hava Durumu sekmesi çalışıyor mu?** → Sıcaklık ve konum etiketi geliyor mu kontrol et
+- [ ] **Oyun sekmesi çalışıyor mu?** → Butona basılı tut, bırak, yeni rekor rozetini gör
 - [ ] **Arkadaş arama çalışıyor mu?** → Profil ekranından kullanıcı adı ara
 - [ ] **Konum paylaşımı çalışıyor mu?** → Switch'i aç, Firestore Console'dan kontrol et
 - [ ] **Dark mode çalışıyor mu?** → Cihaz ayarlarından karanlık tema aç

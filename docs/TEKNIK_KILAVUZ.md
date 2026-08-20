@@ -1,4 +1,4 @@
-# 📖 Yakında — Teknik Çalışma Kılavuzu
+# 📖 Circle — Teknik Çalışma Kılavuzu
 
 > Bu doküman, projedeki **her dosyayı, her fonksiyonu, her mimari kararı** satır satır açıklar.
 > Mülakat öncesi bu dokümanı baştan sona çalışarak projeye tam hakimiyet sağlayabilirsin.
@@ -15,12 +15,14 @@
 6. [Auth Ekranları — Login & Register](#6-auth-ekranları--login--register)
 7. [Harita Ekranı — HomeScreen](#7-harita-ekranı--homescreen)
 8. [Profil Ekranı — ProfileScreen](#8-profil-ekranı--profilescreen)
-9. [Servisler — LocationService & OverpassService](#9-servisler--locationservice--overpassservice)
-10. [Widget — UserAvatar](#10-widget--useravatar)
-11. [Firestore Veritabanı Tasarımı](#11-firestore-veritabanı-tasarımı)
-12. [Tema ve Material 3](#12-tema-ve-material-3)
-13. [Android Build Yapılandırması](#13-android-build-yapılandırması)
-14. [Olası Mülakat Soru-Cevapları](#14-olası-mülakat-soru-cevapları)
+9. [Hava Durumu Ekranı — WeatherScreen](#9-hava-durumu-ekranı--weatherscreen)
+10. [Oyun Ekranı — GameScreen (Nefes Tutma Yarışı)](#10-oyun-ekranı--gamescreen-nefes-tutma-yarışı)
+11. [Servisler — LocationService, OverpassService, WeatherService & GeocodingService](#11-servisler--locationservice-overpassservice-weatherservice--geocodingservice)
+12. [Widget'lar — UserAvatar & AppMark](#12-widgetlar--useravatar--appmark)
+13. [Firestore Veritabanı Tasarımı](#13-firestore-veritabanı-tasarımı)
+14. [Tema ve Material 3](#14-tema-ve-material-3)
+15. [Android Build Yapılandırması](#15-android-build-yapılandırması)
+16. [Olası Mülakat Soru-Cevapları](#16-olası-mülakat-soru-cevapları)
 
 ---
 
@@ -96,6 +98,7 @@ class AppUser {
   final LatLng? location;
   final DateTime? locationUpdatedAt;
   final String? photoBase64;
+  final int? breathHoldBestMs;   // ⑦ Nefes tutma oyunu — kişisel rekor (ms)
 }
 ```
 
@@ -112,6 +115,7 @@ factory AppUser.fromFirestore(String uid, Map<String, dynamic> data) {
     location: geo != null ? LatLng(geo.latitude, geo.longitude) : null,  // ⑤
     locationUpdatedAt: updatedAt?.toDate(),            // ⑥
     photoBase64: data['photoBase64'] as String?,
+    breathHoldBestMs: (data['breathHoldBestMs'] as num?)?.toInt(),  // ⑦
   );
 }
 ```
@@ -124,6 +128,7 @@ factory AppUser.fromFirestore(String uid, Map<String, dynamic> data) {
 | ④ | `List<String>.from(...)` | Firestore'dan gelen `List<dynamic>` tipini `List<String>`'e cast eder. Doğrudan cast (`as List<String>`) runtime hatası verir çünkü Firestore dynamic list döndürür |
 | ⑤ | `GeoPoint` → `LatLng` dönüşümü | Firestore `GeoPoint` kullanırken, `flutter_map` kütüphanesi `LatLng` bekler. Model katmanında bu dönüşümü yaparak UI'ın Firestore'a bağımlılığını kırıyoruz |
 | ⑥ | `updatedAt?.toDate()` | `?.` (null-aware operator): eğer `updatedAt` null ise `toDate()` çağrılmaz, direkt `null` döner |
+| ⑦ | `(data[...] as num?)?.toInt()` | Firestore sayısal alanları platforma göre `int` veya `double` gelebilir; `num?` ile ikisini de kabul edip `toInt()` ile normalize ediyoruz. Oyun hiç oynanmadıysa alan yok → `null` |
 
 **Mülakat İpucu:** "Neden `toJson()` / serialization metodu yok?" → Yazma işlemlerini provider katmanında direkt `Map` literal olarak yapıyoruz. Küçük projede `toJson()` gereksiz boilerplate olurdu. Büyük projelerde `freezed` veya `json_serializable` kullanılabilir.
 
@@ -350,6 +355,19 @@ Future<void> updatePhoto(String uid, String photoBase64) async {
 - `LatLng` → `GeoPoint` dönüşümü: `flutter_map` `LatLng` kullanırken, Firestore `GeoPoint` bekler
 - `serverTimestamp()`: Konum ne zaman güncellendiğini sunucu saatiyle kaydeder
 
+### 4.7 `updateBreathHoldRecord` — Oyun Rekoru Kaydetme
+
+```dart
+Future<void> updateBreathHoldRecord(String uid, int ms) async {
+  await _firestore.collection('users').doc(uid).update({
+    'breathHoldBestMs': ms,
+  });
+}
+```
+
+- Nefes tutma oyununda (bkz. [Bölüm 10](#10-oyun-ekranı--gamescreen-nefes-tutma-yarışı)) tur bitince `GameScreen`, önce kullanıcının mevcut rekorunu okur, yeni süre daha yüksekse bu metodu çağırır
+- Kontrol client tarafında yapılır (yeni süre eski rekordan büyük mü) — sunucu tarafında bir `max()` garantisi yoktur, bu yüzden yarış koşulu (race condition) teorik olarak mümkündür ama tek kullanıcı kendi rekorunu yazdığı için pratikte risksizdir
+
 ---
 
 ## 5. Navigasyon Mimarisi — AuthGate & RootShell
@@ -397,18 +415,22 @@ Firebase Auth paketi kendi `AuthProvider` sınıfını içerir. Bizim yazdığı
 ```dart
 class _RootShellState extends State<RootShell> {
   int _index = 0;
-  static const _screens = [HomeScreen(), ProfileScreen()];  // ①
+  static const _screens = [
+    HomeScreen(), WeatherScreen(), GameScreen(), ProfileScreen(),  // ①
+  ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: _screens[_index],                                // ②
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _index,
-        onTap: (i) => setState(() => _index = i),            // ③
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.map), label: 'Harita'),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profil'),
+      body: IndexedStack(index: _index, children: _screens),        // ②
+      bottomNavigationBar: NavigationBar(                           // ③
+        selectedIndex: _index,
+        onDestinationSelected: (i) => setState(() => _index = i),   // ④
+        destinations: const [
+          NavigationDestination(icon: Icon(Icons.map_outlined), selectedIcon: Icon(Icons.map), label: 'Harita'),
+          NavigationDestination(icon: Icon(Icons.wb_sunny_outlined), selectedIcon: Icon(Icons.wb_sunny), label: 'Hava Durumu'),
+          NavigationDestination(icon: Icon(Icons.air_outlined), selectedIcon: Icon(Icons.air), label: 'Oyun'),
+          NavigationDestination(icon: Icon(Icons.person_outline), selectedIcon: Icon(Icons.person), label: 'Profil'),
         ],
       ),
     );
@@ -418,11 +440,14 @@ class _RootShellState extends State<RootShell> {
 
 | # | Açıklama |
 |---|----------|
-| ① | `static const`: Ekranlar sabittir, her tab değişiminde yeniden oluşturulmaz → performans |
-| ② | Aktif index'e göre hangi ekranı göstereceğini seçer |
-| ③ | Tab'a tıklanınca `setState` ile index güncellenir → build yeniden çalışır → doğru ekran gösterilir |
+| ① | `static const`: 4 ekran sabittir, her tab değişiminde yeniden oluşturulmaz → performans |
+| ② | `IndexedStack`, `_screens[_index]`'in aksine **tüm ekranları aynı anda ağaçta tutar**, sadece görünen olanı değiştirir. Böylece Hava Durumu ekranı geri sekmeye geçilip dönüldüğünde tekrar API çağrısı yapmaz, state'i korunur |
+| ③ | `NavigationBar`, Material 3'ün alt navigasyon bileşeni — eski `BottomNavigationBar`'ın yerini alır, seçili öğeyi pill-shaped bir arka planla vurgular |
+| ④ | Tab'a tıklanınca `setState` ile index güncellenir → build yeniden çalışır → `IndexedStack` doğru ekranı öne getirir |
 
 **StatefulWidget neden burada gerekli?** `_index` değişkeni state'tir. Tab seçimi değiştiğinde UI'ın güncellenmesi gerekir. StatelessWidget'ta `setState` çağıramazsın.
+
+**`IndexedStack` vs doğrudan `_screens[_index]` (Kritik Mülakat Sorusu):** `_screens[_index]` her tab değişiminde eski ekranı `dispose` edip yeniyi `initState`'ten kurar — Hava Durumu ekranındaki `initState`'te tetiklenen API çağrısı her sekme değişiminde tekrar çalışırdı. `IndexedStack` tüm çocukları canlı tutar, sadece `Offstage` benzeri bir mekanizmayla gizler; bellek maliyeti biraz daha yüksektir ama state kaybı ve gereksiz network çağrısı olmaz.
 
 ---
 
@@ -660,9 +685,175 @@ final myUid = context.watch<AuthProvider>().currentUser!.uid;  // watch: rebuild
 
 ---
 
-## 9. Servisler — LocationService & OverpassService
+## 9. Hava Durumu Ekranı — WeatherScreen
 
-### LocationService — GPS Erişim Katmanı
+**Dosya:** `lib/screens/weather/weather_screen.dart`
+
+### Yükleme Akışı — `_load()`
+
+```dart
+Future<void> _load() async {
+  setState(() { _loading = true; _failed = false; });
+  final location = await LocationService().getCurrentLocation() ?? _fallbackCenter;   // ①
+
+  try {
+    final results = await Future.wait([                        // ②
+      WeatherService().fetchCurrentWeather(location),
+      GeocodingService().reverseGeocode(location),
+    ]);
+    final weather = results[0] as WeatherInfo;
+    final locationInfo = results[1] as LocationInfo?;
+    setState(() {
+      _weather = weather;
+      _locationDisplay = locationInfo?.displayName;
+      _lastUpdated = DateTime.now();
+      _loading = false;
+    });
+    _fadeController.forward();                                 // ③
+  } on WeatherException {
+    setState(() { _failed = true; _loading = false; });         // ④
+  }
+}
+```
+
+| # | Açıklama |
+|---|----------|
+| ① | Konum bulunamazsa (izin yok, GPS kapalı) İstanbul fallback koordinatı kullanılır — `HomeScreen`'deki aynı desen tekrar kullanılıyor |
+| ② | `Future.wait`: Hava durumu ve ters coğrafi kodlama (şehir/ilçe adı) **paralel** çekilir. Sırayla (`await` + `await`) yapılsaydı toplam süre iki isteğin toplamı olurdu, paralelde en yavaş isteğin süresi kadar sürer |
+| ③ | Veri geldiğinde `AnimationController.forward()` ile `FadeTransition` tetiklenir — içerik aniden değil yumuşak biçimde belirir |
+| ④ | Sadece hava durumu isteği (`WeatherException`) başarısız olursa hata ekranı gösterilir. Geocoding `null` dönerse (bkz. [Bölüm 11.3](#11-servisler--locationservice-overpassservice-weatherservice--geocodingservice)) uygulama konum etiketini basitçe göstermez, çökmez |
+
+### Duruma Göre Gradient Arka Plan
+
+```dart
+List<Color> _gradientForWeatherCode(String? description) {
+  final desc = description?.toLowerCase() ?? '';
+  if (desc.contains('açık')) return [Color(0xFF4FC3F7), Color(0xFF0288D1)];   // Güneşli — mavi
+  if (desc.contains('bulutlu')) return [Color(0xFF90A4AE), Color(0xFF546E7A)]; // Gri
+  if (desc.contains('yağmur')) return [Color(0xFF5C6BC0), Color(0xFF283593)];  // Lacivert
+  if (desc.contains('kar')) return [Color(0xFFB3E5FC), Color(0xFF81D4FA)];     // Açık mavi
+  if (desc.contains('fırtına')) return [Color(0xFF37474F), Color(0xFF1A237E)]; // Koyu
+  if (desc.contains('sis')) return [Color(0xFFB0BEC5), Color(0xFF78909C)];     // Gri-mavi
+  return [Color(0xFF4FC3F7), Color(0xFF0288D1)];   // Varsayılan
+}
+```
+
+- `AnimatedContainer` içinde kullanılır → hava durumu değiştiğinde arka plan renkleri **800ms**'de yumuşakça geçiş yapar, aniden değişmez
+- Metin karşılaştırması Türkçe açıklama string'i üzerinden yapılır (WMO kodları zaten `WeatherService` içinde Türkçe açıklamaya çevrilmiş durumda)
+
+### Glassmorphism Sıcaklık Kartı
+
+```dart
+ClipRRect(
+  borderRadius: BorderRadius.circular(24),
+  child: BackdropFilter(
+    filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),      // ①
+    child: Container(
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.15),        // ②
+        border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+      ),
+      child: Column(children: [Text('${weather.temperatureCelsius.round()}°C'), Text(weather.description)]),
+    ),
+  ),
+)
+```
+
+| # | Açıklama |
+|---|----------|
+| ① | `BackdropFilter` + `ImageFilter.blur`: Kartın **arkasındaki** gradient'i bulanıklaştırır — buzlu cam efekti (glassmorphism) |
+| ② | Kartın kendisi yarı saydam beyaz (`alpha: 0.15`) — bulanık arka plan üzerinde "cam panel" hissi verir |
+
+**`RefreshIndicator` ile Yenileme:** Ekran `RefreshIndicator(onRefresh: _load, ...)` ile sarılı — aşağı çekince `_load()` tekrar çalışır, tıpkı native hava durumu uygulamalarındaki gibi.
+
+---
+
+## 10. Oyun Ekranı — GameScreen (Nefes Tutma Yarışı)
+
+**Dosya:** `lib/screens/game/game_screen.dart`
+
+Basit ama tüm state yönetimi kalıplarını (Timer, GestureDetector, async Firestore yazma, stream+future birleşimi) bir arada gösteren küçük bir mini oyun.
+
+### Basılı Tutma Mekaniği
+
+```dart
+void _onTapDown(TapDownDetails _) {
+  setState(() { _holding = true; _elapsedMs = 0; _startTime = DateTime.now(); });  // ①
+  _timer = Timer.periodic(const Duration(milliseconds: 100), (_) {                  // ②
+    setState(() => _elapsedMs = DateTime.now().difference(_startTime!).inMilliseconds);
+  });
+}
+
+void _onTapUp(TapUpDetails _) => _stopHolding();
+void _onTapCancel() => _stopHolding();   // ③
+```
+
+| # | Açıklama |
+|---|----------|
+| ① | Parmak ekrana değdiği an gerçek başlangıç zamanı (`DateTime.now()`) kaydedilir — sayaç bu referanstan hesaplanır |
+| ② | `Timer.periodic(100ms)`: Ekranda gösterilen süreyi her 100ms'de bir günceller. **Not:** Bu sadece görsel bir yenileme — gerçek süre her zaman `DateTime.now().difference(_startTime!)` ile hesaplanır, Timer'ın kendi periyodu birikerek hata payı yaratmaz |
+| ③ | `onTapCancel`: Kullanıcı parmağını ekran dışına kaydırırsa da (örneğin bildirim çekmecesini açarsa) tutma işlemi güvenli şekilde sonlanır — `onTapUp` tetiklenmez ama `onTapCancel` tetiklenir |
+
+**Neden `Timer.periodic` ile `_elapsedMs`'i her 100ms'de yeniden hesaplıyoruz, biriktirmiyoruz?** `elapsedMs += 100` yaklaşımı kullansaydık, `setState`/timer callback'lerinin gerçek zamanlayıcı hassasiyeti (event loop yoğunluğu, GC duraklamaları) yüzünden gerçek süreden sapardı. `DateTime.now().difference(_startTime!)` her seferinde **gerçek** geçen süreyi verir — Timer sadece "ne zaman yeniden çizeceğini" tetikler, süreyi kendisi tutmaz.
+
+### Rekor Kaydetme
+
+```dart
+Future<void> _stopHolding() async {
+  _timer?.cancel();
+  final finalMs = DateTime.now().difference(_startTime!).inMilliseconds;   // ① Son kez kesin hesap
+  setState(() { _holding = false; _elapsedMs = finalMs; });
+
+  final me = await friendsProvider.watchUser(myUid).first;                 // ②
+  if (finalMs > (me.breathHoldBestMs ?? 0)) {                              // ③
+    await friendsProvider.updateBreathHoldRecord(myUid, finalMs);
+    setState(() => _isNewRecord = true);
+  }
+}
+```
+
+| # | Açıklama |
+|---|----------|
+| ① | Parmak kalktığı an son kez tam hassasiyetle hesaplanır — `Timer`'ın son 100ms'lik gecikmesinden etkilenmez |
+| ② | `watchUser(uid).first`: Bir stream'i tek seferlik `Future`'a çevirme kalıbı — `FriendsProvider`'da zaten var olan gerçek zamanlı stream'i tekrar yazmaya gerek kalmadan yeniden kullanır |
+| ③ | Rekor kontrolü **client tarafında**: mevcut en iyi süre `null` ise (`?? 0`) her sonuç yeni rekor sayılır |
+
+### Liderlik Tablosu — Stream + Future Birleşimi
+
+```dart
+StreamBuilder<AppUser>(
+  stream: friendsProvider.watchUser(myUid),              // ① Kendi profilimi canlı dinle
+  builder: (context, snapshot) {
+    final me = snapshot.data!;
+    return FutureBuilder<List<AppUser>>(
+      future: friendsProvider.getFriends(me.friends),    // ② Arkadaşları tek seferlik çek
+      builder: (context, friendsSnapshot) {
+        final allPlayers = [me, ...friendsSnapshot.data ?? const []];
+        allPlayers.sort((a, b) {                          // ③ Yüksekten düşüğe, null'lar en sona
+          if (a.breathHoldBestMs == null) return 1;
+          if (b.breathHoldBestMs == null) return -1;
+          return b.breathHoldBestMs!.compareTo(a.breathHoldBestMs!);
+        });
+        return ListView.builder(...);
+      },
+    );
+  },
+)
+```
+
+| # | Açıklama |
+|---|----------|
+| ① | Dış `StreamBuilder`, kendi rekorum her değiştiğinde (yeni rekor kaydedince) otomatik rebuild olur |
+| ② | İç `FutureBuilder`, arkadaş listesini asenkron çeker — arkadaş sayısı değişmediği sürece bu veri değişmez |
+| ③ | Sıralama mantığı: iki taraf da `null` → eşit; sadece `a` null → `a` sona; sadece `b` null → `b` sona; ikisi de dolu → büyükten küçüğe |
+
+**Bilinen küçük iyileştirme alanı:** İç `FutureBuilder`'ın `future:` parametresi, dış `StreamBuilder` her rebuild olduğunda (yani her yeni rekorda) yeniden oluşturulur — bu, arkadaş listesini gereksiz yere tekrar çekmesine yol açabilir. Küçük arkadaş listelerinde (staj projesi ölçeği) fark edilmez; production'da `getFriends` sonucu `initState`'te bir kere çekilip state'te tutulur, sadece gerektiğinde yenilenirdi.
+
+---
+
+## 11. Servisler — LocationService, OverpassService, WeatherService & GeocodingService
+
+### 11.1 LocationService — GPS Erişim Katmanı
 
 ```dart
 Future<LatLng?> getCurrentLocation() async {
@@ -701,7 +892,7 @@ getCurrentPosition → LatLng döner
 
 **`LocationAccuracy.high`:**  GPS + Wi-Fi + Cell Tower triangulation kullanarak en hassas konumu alır (±3-5 metre). `low` kullanılsaydı sadece Cell Tower ile ~500m hassasiyet olurdu.
 
-### OverpassService — Yakındaki Yerler API'si
+### 11.2 OverpassService — Yakındaki Yerler API'si
 
 ```dart
 class NearbyPlace {
@@ -740,10 +931,80 @@ out body;
 - `out body;`: Tüm tag'ları dahil ederek döndür
 
 **Hata Yönetimi Katmanları:**
-1. **HTTP timeout (client):** `.timeout(const Duration(seconds: 20))` → 20 saniye client-side limit
+1. **HTTP timeout (client):** `.timeout(const Duration(seconds: 30))` → 30 saniye client-side limit (sunucu limitinden **büyük** olmalı — aksi halde client, sunucu daha cevap veremeden isteği kendisi iptal eder)
 2. **Overpass timeout (server):** `[timeout:25]` → 25 saniye server-side limit
-3. **HTTP status kontrolü:** `statusCode != 200` → OverpassException fırlatır
-4. **HomeScreen catch:** `on OverpassException` → kırmızı banner gösterir
+3. **Retry + backoff:** `overpass-api.de` ücretsiz/paylaşımlı bir servis olduğu için ara sıra `429 Too Many Requests` veya yavaş cevap dönebilir. `fetchNearbyPlaces`, `maxAttempts = 3` ile dener; her denemede `attempt * 2` saniye bekler (2s → 4s), son denemede de başarısız olursa `OverpassException` fırlatır
+4. **HTTP status kontrolü:** `statusCode != 200` → `OverpassException` fırlatır
+5. **HomeScreen catch:** `on OverpassException` → kırmızı banner + manuel **"Tekrar Dene"** butonu gösterir (kullanıcı retry döngüsünü tekrar tetikleyebilir)
+
+**Neden client timeout > server timeout olmalı?** İlk sürümde client timeout (20s), Overpass sorgusunun kendi `[timeout:25]` değerinden **küçüktü** — yani sunucu daha cevap üretemeden istemci bağlantıyı kesiyordu. Bu, "Yakındaki yerler yüklenemedi" hatasının sık görülmesinin asıl nedeniydi. Client timeout'u 30s'ye çekmek + retry eklemek bu sorunu çözdü.
+
+### 11.3 WeatherService — Anlık Hava Durumu
+
+**Dosya:** `lib/services/weather_service.dart`
+
+```dart
+Future<WeatherInfo> fetchCurrentWeather(LatLng location, {int maxAttempts = 3}) async {
+  final uri = Uri.parse('https://api.open-meteo.com/v1/forecast').replace(queryParameters: {
+    'latitude': '${location.latitude}', 'longitude': '${location.longitude}',
+    'current': 'temperature_2m,weather_code', 'timezone': 'auto',
+  });
+  for (var attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      final response = await http.get(uri).timeout(const Duration(seconds: 30));
+      if (response.statusCode != 200) throw WeatherException('...');
+      final current = jsonDecode(response.body)['current'];
+      final (description, icon) = _describeWeatherCode(current['weather_code']);   // ①
+      return WeatherInfo(temperatureCelsius: current['temperature_2m'], description: description, icon: icon);
+    } catch (e) {
+      if (attempt == maxAttempts) throw e is WeatherException ? e : WeatherException('$e');
+      await Future.delayed(Duration(seconds: attempt * 2));   // ② Aynı retry+backoff kalıbı
+    }
+  }
+  throw WeatherException('Weather request failed');
+}
+```
+
+| # | Açıklama |
+|---|----------|
+| ① | `(String, IconData) _describeWeatherCode(int code)`: **Dart 3 record** kullanır — iki değeri (açıklama metni + ikon) tek fonksiyondan, ayrı bir sınıf tanımlamadan döndürür. Open-Meteo, hava durumunu [WMO kodları](https://open-meteo.com/en/docs) (0 = açık, 61-82 = yağmur, 95-99 = fırtına vb.) ile döner; bu fonksiyon kodu Türkçe açıklama + Material ikonuna eşler |
+| ② | `OverpassService` ile **birebir aynı** retry+backoff deseni — kod tekrarı gibi görünse de, iki servis farklı domain hatalarına (`WeatherException` vs `OverpassException`) sahip olduğu için ayrı tutuldu. Ortak bir `RetryableHttpClient` yardımcı sınıfı çıkarmak production'da mantıklı bir refactor olurdu |
+
+**Neden Open-Meteo?** API anahtarı gerektirmez (OpenStreetMap gibi ücretsiz ve açık), `current` parametresiyle tek istekte anlık sıcaklık + hava kodu döner, projedeki "API key yönetmeden hızlı prototipleme" prensibiyle örtüşür.
+
+### 11.4 GeocodingService — Ters Coğrafi Kodlama
+
+**Dosya:** `lib/services/geocoding_service.dart`
+
+```dart
+Future<LocationInfo?> reverseGeocode(LatLng location, {int maxAttempts = 3}) async {
+  final uri = Uri.parse('https://nominatim.openstreetmap.org/reverse').replace(queryParameters: {
+    'lat': '${location.latitude}', 'lon': '${location.longitude}',
+    'format': 'json', 'accept-language': 'tr', 'zoom': '10',
+  });
+  for (var attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      final response = await http.get(uri, headers: {'User-Agent': 'flutter_proje/1.0'})  // ①
+          .timeout(const Duration(seconds: 30));
+      if (response.statusCode != 200) { if (attempt == maxAttempts) return null; ... continue; }
+      final address = jsonDecode(response.body)['address'];
+      final city = address['province'] ?? address['state'] ?? address['city'];
+      if (city == null) return null;                                                     // ②
+      return LocationInfo(city: city, district: address['district'] ?? address['town'] ?? ...);
+    } catch (e) {
+      if (attempt == maxAttempts) return null;                                            // ③
+      await Future.delayed(Duration(seconds: attempt * 2));
+    }
+  }
+  return null;
+}
+```
+
+| # | Açıklama |
+|---|----------|
+| ① | Nominatim'in [kullanım politikası](https://operations.osmfoundation.org/policies/nominatim/) `User-Agent` header'ı **zorunlu** kılar — olmadan istekler reddedilebilir |
+| ② | Adres verisinde şehir bilgisi hiç yoksa `null` döner — exception fırlatmaz |
+| ③ | **Diğer servislerden farklı olarak** son denemede de başarısız olursa exception fırlatmak yerine `null` döner. **Neden?** Konum etiketi (`"Ankara, Yenimahalle"`) sadece kozmetik bir bilgi — hava durumu ekranının asıl işlevi (sıcaklık göstermek) buna bağlı değil. `WeatherScreen`, `results[1] as LocationInfo?` ile bunu opsiyonel kabul eder; `null` gelirse konum satırını hiç göstermez, ekranın geri kalanı normal çalışmaya devam eder — **graceful degradation** |
 
 **Tag Parsing Mantığı:**
 ```dart
@@ -759,7 +1020,7 @@ return NearbyPlace(
 
 ---
 
-## 10. Widget — UserAvatar
+## 12. Widget'lar — UserAvatar & AppMark
 
 ```dart
 class UserAvatar extends StatelessWidget {
@@ -795,9 +1056,51 @@ class UserAvatar extends StatelessWidget {
 - Fotoğraf yoksa graceful degradation: baş harf gösterilir, hata fırlatılmaz
 - Her yerde aynı görünüm: profil ekranı, arkadaş listesi, arama sonuçları
 
+### AppMark — Marka Logosu
+
+**Dosya:** `lib/widgets/app_mark.dart`
+
+```dart
+class AppMark extends StatelessWidget {
+  final double size;
+  const AppMark({super.key, this.size = 56});
+
+  @override
+  Widget build(BuildContext context) {
+    final scale = size / 100;                                    // ①
+    final diameter = 54 * scale;
+    Widget circle(double centerX, Color color, {double opacity = 1}) {
+      return Positioned(
+        left: centerX * scale - diameter / 2,
+        top: size / 2 - diameter / 2,
+        child: Opacity(
+          opacity: opacity,
+          child: Container(width: diameter, height: diameter,
+              decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+        ),
+      );
+    }
+    return SizedBox(width: size, height: size, child: Stack(children: [
+      circle(36, const Color(0xFF14213D)),                        // ② Lacivert daire
+      circle(64, const Color(0xFF2DD4BF), opacity: 0.85),          // ③ Turkuaz daire
+    ]));
+  }
+}
+```
+
+| # | Açıklama |
+|---|----------|
+| ① | Logo, 100 birimlik bir "viewBox" üzerinde tasarlandı (SVG mantığı). `scale = size / 100` ile bu tasarım istenen piksel boyutuna (`size`) orantılı biçimde ölçeklenir — 24px'de de 200px'de de aynı oranlar korunur |
+| ② | Marka rengi **Lacivert** (`#14213D`) — sol daire, tam opak |
+| ③ | Marka rengi **Turkuaz** (`#2DD4BF`) — sağ daire, `opacity: 0.85` ile lacivert dairenin üzerine hafif saydam bindirilir. İki dairenin kesişimi "buluşma/bağlantı" temasını simgeler — uygulamanın konum paylaşma/arkadaşlık temasıyla örtüşen bir görsel metafor |
+
+**Neden `CustomPainter` değil de `Stack` + `Positioned`?** Logo sadece iki basit daireden oluşuyor; `CustomPainter` (canvas'a doğrudan çizim) burada gereksiz bir soyutlama olurdu. Mevcut widget'larla (`Container`, `BoxDecoration(shape: BoxShape.circle)`) aynı basit üsluba sadık kalındı — projede zaten `CustomPainter` kullanılan başka bir yer yok.
+
+**Nerede kullanılıyor?** Login ekranındaki marka rozetinde (`AppMark(size: 56)`), önceki `Icon(Icons.explore)` placeholder'ının yerine. Uygulama ikonu (mipmap'ler) ise aynı logonun ImageMagick ile rasterize edilmiş, kirli krem arka planlı (`#FDF6EE`) 5 farklı yoğunluk (mdpi–xxxhdpi) versiyonu.
+
 ---
 
-## 11. Firestore Veritabanı Tasarımı
+## 13. Firestore Veritabanı Tasarımı
 
 ### Neden Tek Koleksiyon (`users`)?
 
@@ -812,6 +1115,7 @@ users/
   │     ├── location: GeoPoint(41.0082, 28.9784)
   │     ├── locationUpdatedAt: Timestamp(...)
   │     ├── photoBase64: "iVBORw0KGgo..."
+  │     ├── breathHoldBestMs: 12800        (nullable — hiç oynamadıysa yok)
   │     └── createdAt: Timestamp(...)
   └── uid_def456/
         └── ...
@@ -838,7 +1142,7 @@ Projenin ölçeğinde (staj projesi, sınırlı kullanıcı) array yaklaşımı 
 
 ---
 
-## 12. Tema ve Material 3
+## 14. Tema ve Material 3
 
 ### `colorSchemeSeed` Nasıl Çalışır?
 
@@ -873,7 +1177,7 @@ themeMode: ThemeMode.system,       // ← Cihaz ayarını takip et
 
 ---
 
-## 13. Android Build Yapılandırması
+## 15. Android Build Yapılandırması
 
 ### Gradle Yapısı
 
@@ -901,7 +1205,7 @@ android/
 
 ---
 
-## 14. Olası Mülakat Soru-Cevapları
+## 16. Olası Mülakat Soru-Cevapları
 
 ### S1: "Provider yerine neden Riverpod veya BLoC kullanmadın?"
 
@@ -950,3 +1254,15 @@ android/
 > 1. **Firebase Storage geçişi** — Profil fotoğrafları için
 > 2. **Arkadaşlık istek sistemi** — Doğrudan eklemek yerine pending/accepted mekanizması
 > 3. **Geohash tabanlı spatial query** — Binlerce kullanıcıda tüm arkadaşları çekmek yerine sadece yakındakileri sorgulamak
+
+### S11: "Overpass ve Open-Meteo isteklerinde neden retry+backoff var, neden tek seferde deneyip hata göstermiyorsun?"
+
+> `overpass-api.de` ve Open-Meteo ücretsiz/paylaşımlı public API'ler — ara sıra `429 Too Many Requests` dönebiliyorlar veya normalden yavaş cevap verebiliyorlar. Gerçek cihazda test ederken bunu doğrudan gözlemledim (curl ile tekrarlanan isteklerde değişken 2-16 saniye yanıt süreleri ve zaman zaman 429). Tek denemeyle hata göstermek yerine, `attempt * 2` saniye artan beklemeyle 3 kez deniyorum — geçici bir yoğunluk anını atlatmak için genelde yeterli. Son denemede de başarısız olursa ancak o zaman kullanıcıya hata gösteriyorum.
+
+### S12: "GeocodingService neden hata durumunda exception fırlatmak yerine null dönüyor?"
+
+> Çünkü konum etiketi (`"Ankara, Yenimahalle"`) hava durumu ekranının **kritik olmayan** bir parçası — sadece kozmetik bilgi. `WeatherService` başarısız olursa ekranın asıl amacı (sıcaklık göstermek) çöker, bu yüzden orada exception fırlatıp hata ekranı gösteriyorum. Ama geocoding başarısız olursa uygulamanın konum satırını göstermeden devam etmesi kullanıcı deneyimi açısından çok daha iyi — bu **graceful degradation** prensibi.
+
+### S13: "IndexedStack kullanmasaydın ne olurdu?"
+
+> `RootShell`, 4 ekranı `IndexedStack` içinde tutuyor, `_screens[_index]` gibi direkt indeksleme yapmıyor. Eğer direkt indeksleme yapsaydım, her sekme değişiminde eski ekran `dispose` edilir, yenisi sıfırdan `initState`'ten kurulurdu. Bu, Hava Durumu sekmesinde her seferinde yeniden API çağrısı yapılması (gereksiz network trafiği + kullanıcının her seferinde loading spinner görmesi) ve Oyun sekmesinde elde tutulmakta olan basılı-tutma state'inin sekme değişince sıfırlanması gibi sorunlara yol açardı. `IndexedStack` tüm ekranları canlı tutarak bunu önlüyor; bedeli biraz daha fazla bellek kullanımı.
