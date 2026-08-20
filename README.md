@@ -118,8 +118,8 @@ flutter run
 
 | Hesap | E-posta | Şifre |
 |:---|:---|:---|
-| Kullanıcı 1 | `test1@yakinda.com` | `test123456` |
-| Kullanıcı 2 | `test2@yakinda.com` | `test123456` |
+| Kullanıcı 1 | `testuser1@example.com` | `test1234` |
+| Kullanıcı 2 | `testuser2@example.com` | `test1234` |
 
 İki farklı cihazda giriş yapıp **Profil → Konum Paylaş** seçeneğini aktifleştirerek birbirinizi haritada takip edebilirsiniz.
 
